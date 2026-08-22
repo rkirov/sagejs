@@ -387,6 +387,27 @@ test("every structural and optimization graph operation has a semantic smoke tes
   });
 });
 
+test("explicit plot positions and layouts reach the renderer", async () => {
+  await withSage(async (session) => {
+    // A keyword option must survive into the plot.  Reading the option
+    // mapping by subscript silently produced no positions at all.
+    const result = await session.evaluate(
+      [
+        "G = graphs.CycleGraph(4)",
+        "places = {v: (v, 0) for v in G}",
+        "supplied = G.graphplot(pos=places)._positions()",
+        "circular = G.graphplot(layout='circular')._positions()",
+        "default_positions = G.graphplot()._positions()",
+        "[[point[0] for point in supplied] == [0, 1, 2, 3],",
+        " [point[1] for point in supplied] == [0, 0, 0, 0],",
+        " len(circular) == 4, circular != supplied,",
+        " len(default_positions) == 4]",
+      ].join("\n"),
+    );
+    assert.equal(result.repr, "[True, True, True, True, True]");
+  });
+});
+
 test("every named graph and digraph generator has a semantic smoke test", async () => {
   cover("GraphGenerators", [
     "EmptyGraph", "CompleteGraph", "CompleteBipartiteGraph", "PathGraph",

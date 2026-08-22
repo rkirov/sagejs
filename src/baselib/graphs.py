@@ -133,6 +133,14 @@ def _position_dict(entries: Any) -> dict[Any, Any]:
     return positions
 
 
+def _mapping_value(mapping: Any, key: Any) -> Any:
+    """Read one entry from a mapping, whichever compiled source built it."""
+    getter = runtime.reflect.get(mapping, "get")
+    if runtime.jstype(getter) == "function":
+        return runtime.reflect.apply(getter, mapping, [key])
+    return runtime.reflect.get(mapping, key)
+
+
 def _same(left: Any, right: Any) -> bool:
     try:
         return bool(left == right)
@@ -386,16 +394,21 @@ class GraphPlot:
         self._options = dict(options)
 
     def _positions(self) -> list[tuple[float, float]]:
-        if "pos" in self._options:
-            supplied = self._options["pos"]
-        elif "layout" in self._options:
-            supplied = self._graph.layout(self._options["layout"])
-        else:
-            supplied = self._graph.get_pos()
+        # Read options through `get`; a plain subscript on a mapping built from
+        # keyword arguments does not reach its entries in generated code.
+        supplied = self._options.get("pos")
+        if supplied is None:
+            layout = self._options.get("layout")
+            if layout is None:
+                supplied = self._graph.get_pos()
+            else:
+                supplied = self._graph.layout(layout)
         if supplied is not None:
             answer = []
             for vertex in self._graph._vertices:
-                value = supplied[vertex]
+                value = _mapping_value(supplied, vertex)
+                if value is None or value is runtime.undefined:
+                    raise ValueError("no position was supplied for " + repr(vertex))
                 answer.append((float(value[0]), float(value[1])))
             return answer
         count = self._graph.order()
